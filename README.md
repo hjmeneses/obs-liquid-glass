@@ -43,6 +43,8 @@ Shaders para **OBS Studio** que imitan el efecto de vidrio líquido ("Liquid Gla
 | Saturación / Tinte | Color del vidrio |
 | Brillo de borde / Ángulo de la luz | Reflejo especular; *Giro de la luz* lo anima |
 | Sombra | Opacidad y tamaño de la sombra proyectada |
+| Ondulación líquida / Velocidad | Deformación orgánica animada en el vidrio y sus reflejos |
+| Grano de escarcha (Frost) | Textura esmerilada sutil y dispersión aleatoria del desenfoque |
 
 ---
 
@@ -77,6 +79,20 @@ Shaders for **OBS Studio** that mimic the iOS "Liquid Glass" look: background bl
 4. If your shape is white-on-black instead of using transparency, enable **Usar brillo en vez de transparencia** (use luminance).
 
 **Tip:** the filter can only refract what's inside the source it's applied to. To refract everything behind it, apply it to the whole scene (or a canvas-sized group).
+
+### Main parameters
+
+| Parameter (label in OBS) | Effect |
+|---|---|
+| Blur (*Desenfoque*) | Blur radius of the content behind the glass |
+| Refraction (*Refracción*) | Bezel displacement; negative = magnifier effect |
+| Bezel width (*Ancho del bisel*) | How wide the curved edge zone is |
+| Color dispersion (*Dispersión de color*) | RGB split at the bezel (chromatic aberration) |
+| Saturation / Tint (*Saturación / Tinte*) | Glass color |
+| Rim highlight / Light angle (*Brillo de borde / Ángulo de la luz*) | Specular reflection; *Giro de la luz* animates it |
+| Shadow (*Sombra*) | Drop shadow opacity and size |
+| Liquid wave / Speed (*Ondulación líquida / Velocidad*) | Animated organic distortion of the glass and its reflections |
+| Frost grain (*Grano de escarcha*) | Subtle frosted texture and randomized blur scattering |
 
 ## Licencia / License
 
