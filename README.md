@@ -1,0 +1,85 @@
+# obs-liquid-glass
+
+Shaders para **OBS Studio** que imitan el efecto de vidrio líquido ("Liquid Glass") de iOS: desenfoque, refracción en el bisel, dispersión de color, tinte, brillo de borde y sombra.
+
+*[English below](#english)*
+
+## Requisitos
+
+- OBS Studio
+- Plugin [obs-shaderfilter](https://github.com/exeldro/obs-shaderfilter)
+
+## Shaders
+
+| Archivo | Qué hace |
+|---|---|
+| `liquid-glass.shader` | Panel de vidrio rectangular con esquinas redondeadas. Posición, tamaño y radio se ajustan con sliders. Para varios paneles, agrega el filtro varias veces. |
+| `liquid-glass-forma.shader` | La forma del vidrio la define **otra fuente o escena** (PNG con transparencia, texto, figuras…). Donde esa fuente es opaca (o blanca, en modo brillo) aparece vidrio que refracta la escena. |
+
+## Instalación
+
+1. Descarga los archivos `.shader` (o clona el repo).
+2. En OBS, clic derecho sobre la fuente o escena → **Filtros** → **+** → **User-defined shader**.
+3. Activa **Load shader text from file** y elige el archivo `.shader`.
+4. Ajusta los parámetros.
+
+### Usar una forma personalizada (`liquid-glass-forma.shader`)
+
+1. Crea una escena aparte, por ejemplo "Forma Vidrio", con las figuras donde quieres el vidrio. Esa escena no tiene que salir en vivo.
+2. En la escena principal agrega el filtro con `liquid-glass-forma.shader`.
+3. En **Fuente de forma** elige la escena "Forma Vidrio".
+4. Si tu forma es blanca sobre negro en lugar de tener transparencia, activa **Usar brillo en vez de transparencia**.
+
+**Tip:** el filtro solo refracta lo que hay en la fuente donde se aplica. Para que el vidrio refracte todo lo que está detrás, aplícalo a la escena completa (o a un grupo del tamaño del canvas).
+
+## Parámetros principales
+
+| Parámetro | Efecto |
+|---|---|
+| Desenfoque | Radio del blur del contenido detrás del vidrio |
+| Refracción | Desplazamiento en el bisel; negativo = efecto lupa |
+| Ancho del bisel | Qué tan ancha es la zona curva del borde |
+| Dispersión de color | Separación RGB en el bisel (aberración cromática) |
+| Saturación / Tinte | Color del vidrio |
+| Brillo de borde / Ángulo de la luz | Reflejo especular; *Giro de la luz* lo anima |
+| Sombra | Opacidad y tamaño de la sombra proyectada |
+
+---
+
+## English
+
+Shaders for **OBS Studio** that mimic the iOS "Liquid Glass" look: background blur, bezel refraction, chromatic dispersion, tint, rim highlight and drop shadow.
+
+### Requirements
+
+- OBS Studio
+- [obs-shaderfilter](https://github.com/exeldro/obs-shaderfilter) plugin
+
+### Shaders
+
+| File | What it does |
+|---|---|
+| `liquid-glass.shader` | Rounded-rectangle glass panel. Position, size and corner radius are slider controls. Add the filter multiple times for several panels. |
+| `liquid-glass-forma.shader` | The glass shape comes from **another source or scene** (transparent PNG, text, shapes…). Wherever that source is opaque (or white, in luminance mode) you get glass refracting the scene. |
+
+### Install
+
+1. Download the `.shader` files (or clone the repo).
+2. In OBS, right-click a source or scene → **Filters** → **+** → **User-defined shader**.
+3. Enable **Load shader text from file** and pick the `.shader` file.
+4. Tweak the parameters (labels are in Spanish).
+
+### Custom shape (`liquid-glass-forma.shader`)
+
+1. Create a separate scene, e.g. "Glass Shape", containing the shapes you want as glass. It doesn't need to go live.
+2. Add the filter with `liquid-glass-forma.shader` to your main scene.
+3. Set **Fuente de forma** (shape source) to that scene.
+4. If your shape is white-on-black instead of using transparency, enable **Usar brillo en vez de transparencia** (use luminance).
+
+**Tip:** the filter can only refract what's inside the source it's applied to. To refract everything behind it, apply it to the whole scene (or a canvas-sized group).
+
+## Licencia / License
+
+[MIT](LICENSE)
+
+*Inspirado en el diseño Liquid Glass de Apple. Proyecto independiente, sin relación con Apple Inc. / Inspired by Apple's Liquid Glass design. Independent project, not affiliated with Apple Inc.*
