@@ -62,6 +62,7 @@ Shaders para **OBS Studio** que imitan el efecto de vidrio líquido ("Liquid Gla
 | Control | Botones del Centro de control | Casi sin tinte, fondo muy desenfocado, brillo en dos lados |
 | Barra oscura | Barra de búsqueda / Siri | Centro casi negro, el bisel deja ver el fondo refractado |
 | Panel grande | Carpetas | Desenfoque fuerte, tinte oscuro ligero, bisel fino |
+| Objeto grande | Figuras y logos decorativos (400 px o más) | Bisel ancho, refracción fuerte, poco blur: pieza gruesa de vidrio |
 
 También puedes **guardar tus valores actuales** con un nombre y aplicarlos después en otros filtros. Si tenías abiertas las propiedades del filtro, ciérralas y ábrelas de nuevo para ver los sliders actualizados.
 
@@ -122,7 +123,7 @@ Shaders for **OBS Studio** that mimic the iOS "Liquid Glass" look: background bl
 
 1. **Tools → Scripts → +** and pick `liquid-glass-presets.lua`.
 2. Choose your filter under **Filtro de vidrio** (use **Actualizar lista** if it's missing).
-3. Click a preset: **Control** (Control Center buttons), **Barra oscura** (dark search bar / Siri), **Panel grande** (folders).
+3. Click a preset: **Control** (Control Center buttons), **Barra oscura** (dark search bar / Siri), **Panel grande** (folders), **Objeto grande** (large decorative shapes and logos, 400 px+).
 
 You can also save your current values under a name and reuse them on other filters. If the filter's properties window was open, reopen it to see the updated sliders.
 

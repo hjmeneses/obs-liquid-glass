@@ -68,6 +68,21 @@ local PRESETS = {
         },
         colors = { tint_color = BLACK },
     },
+    {
+        id = "grande",
+        label = "Objeto grande (figuras, logos de 400 px o más)",
+        -- Pieza gruesa de vidrio decorativa. Bisel ancho para que el grosor se note en proporción
+        -- al tamaño. Perfil 0.75 y no 1: con un bisel ancho el perfil 100% circular deja toda la
+        -- refracción en una franja finísima y la figura parece burbuja de jabón en vez de vidrio.
+        -- Dispersión baja por la misma razón (el arcoíris en el filo es lo que delata la burbuja).
+        values = {
+            blur_radius = 8, refraction = 110, bezel = 60, bezel_profile = 0.75, dispersion = 0.05,
+            saturation = 1.35, tint_amount = 0.05, tint_edge = 0.5, highlight = 1.0,
+            light_angle = 135, light_speed = 0, back_light = 0.6,
+            shadow_opacity = 0.2, shadow_size = 50, liquid_wave = 0, frost_amount = 0,
+        },
+        colors = { tint_color = WHITE },
+    },
 }
 
 local g_settings = nil       -- configuración del script (aquí se guardan los presets propios)
