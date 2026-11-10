@@ -45,6 +45,25 @@ Shaders para **OBS Studio** que imitan el efecto de vidrio líquido ("Liquid Gla
 | Sombra | Opacidad y tamaño de la sombra proyectada |
 | Ondulación líquida / Velocidad | Deformación orgánica animada en el vidrio y sus reflejos |
 | Grano de escarcha (Frost) | Textura esmerilada sutil y dispersión aleatoria del desenfoque |
+| Perfil del bisel | 0 = curva suave; 1 = convexo tipo iOS, comprime el fondo junto a la orilla |
+| Tinte en el bisel | 1 = el tinte se desvanece en el borde (clave para vidrio oscuro) |
+| Luz del lado opuesto | Brillo en el lado del borde contrario a la luz |
+
+## Presets con botones (script)
+
+`liquid-glass-presets.lua` agrega botones para aplicar estilos tipo iOS. Escribe los valores en el filtro, así que los sliders quedan ajustables.
+
+1. **Herramientas → Scripts → +** y elige `liquid-glass-presets.lua`.
+2. En **Filtro de vidrio** elige tu filtro (si no aparece, **Actualizar lista**).
+3. Presiona un preset:
+
+| Preset | Inspirado en | Rasgos |
+|---|---|---|
+| Control | Botones del Centro de control | Casi sin tinte, fondo muy desenfocado, brillo en dos lados |
+| Barra oscura | Barra de búsqueda / Siri | Centro casi negro, el bisel deja ver el fondo refractado |
+| Panel grande | Carpetas | Desenfoque fuerte, tinte oscuro ligero, bisel fino |
+
+También puedes **guardar tus valores actuales** con un nombre y aplicarlos después en otros filtros. Si tenías abiertas las propiedades del filtro, ciérralas y ábrelas de nuevo para ver los sliders actualizados.
 
 ---
 
@@ -93,6 +112,19 @@ Shaders for **OBS Studio** that mimic the iOS "Liquid Glass" look: background bl
 | Shadow (*Sombra*) | Drop shadow opacity and size |
 | Liquid wave / Speed (*Ondulación líquida / Velocidad*) | Animated organic distortion of the glass and its reflections |
 | Frost grain (*Grano de escarcha*) | Subtle frosted texture and randomized blur scattering |
+| Bezel profile (*Perfil del bisel*) | 0 = soft curve; 1 = iOS-like convex, squeezes the background at the rim |
+| Bezel tint (*Tinte en el bisel*) | 1 = tint fades out at the edge (key for dark glass) |
+| Back light (*Luz del lado opuesto*) | Highlight on the rim side facing away from the light |
+
+### Presets with buttons (script)
+
+`liquid-glass-presets.lua` adds one-click iOS-style presets. It writes the values into the filter, so the sliders stay adjustable.
+
+1. **Tools → Scripts → +** and pick `liquid-glass-presets.lua`.
+2. Choose your filter under **Filtro de vidrio** (use **Actualizar lista** if it's missing).
+3. Click a preset: **Control** (Control Center buttons), **Barra oscura** (dark search bar / Siri), **Panel grande** (folders).
+
+You can also save your current values under a name and reuse them on other filters. If the filter's properties window was open, reopen it to see the updated sliders.
 
 ## Licencia / License
 

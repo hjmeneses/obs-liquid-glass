@@ -128,6 +128,16 @@ uniform float bezel_profile<
     float minimum = 0.0; float maximum = 1.0; float step = 0.01;
 > = 0.0;
 
+// Cuánto se desvanece el tinte hacia la orilla (0 = tinte parejo; 1 = sin tinte en el borde).
+// Por qué: en iOS un vidrio muy oscuro (barra de búsqueda, Siri) sigue viéndose como vidrio
+// porque el bisel deja ver el fondo brillante y refractado aunque el centro sea casi negro.
+// Con tinte parejo, un tinte negro fuerte convierte la pieza en una mancha negra plana.
+uniform float tint_edge<
+    string label = "Tinte en el bisel (1 = se desvanece)";
+    string widget_type = "slider";
+    float minimum = 0.0; float maximum = 1.0; float step = 0.01;
+> = 0.0;
+
 // Cuánto brillo recibe el lado del borde opuesto a la luz. Antes era un 0.4 fijo, lo que
 // iluminaba todo el contorno; en iOS el reflejo está casi solo del lado de la luz (usa ~0).
 uniform float back_light<
@@ -254,7 +264,8 @@ float4 mainImage(VertData v_in) : TARGET
     // Saturación, tinte y grano de escarcha
     float lum = dot(col, float3(0.2126, 0.7152, 0.0722));
     col = lerp(float3(lum, lum, lum), col, saturation);
-    col = lerp(col, tint_color.rgb, tint_amount);
+    // edge vale 1 en la orilla y 0 en la zona plana: el tinte se reduce solo dentro del bisel
+    col = lerp(col, tint_color.rgb, tint_amount * (1.0 - tint_edge * edge));
     if (frost_amount > 0.001)
         col += (noise - 0.5) * frost_amount * 0.12;
 
