@@ -119,6 +119,23 @@ uniform float frost_amount<
     float minimum = 0.0; float maximum = 1.0; float step = 0.01;
 > = 0.0;
 
+// 0 = perfil suave (edge², el original); 1 = perfil convexo circular tipo iOS.
+// El circular concentra casi todo el desplazamiento en los últimos píxeles de la orilla, así el
+// fondo se "comprime y envuelve" junto al borde y el vidrio se ve grueso en vez de plano.
+uniform float bezel_profile<
+    string label = "Perfil del bisel (0 suave, 1 convexo iOS)";
+    string widget_type = "slider";
+    float minimum = 0.0; float maximum = 1.0; float step = 0.01;
+> = 0.0;
+
+// Cuánto brillo recibe el lado del borde opuesto a la luz. Antes era un 0.4 fijo, lo que
+// iluminaba todo el contorno; en iOS el reflejo está casi solo del lado de la luz (usa ~0).
+uniform float back_light<
+    string label = "Luz del lado opuesto";
+    string widget_type = "slider";
+    float minimum = 0.0; float maximum = 1.0; float step = 0.01;
+> = 0.4;
+
 // Hash rápido sin texturas para rotación de muestras y efecto escarcha.
 // Por qué no el clásico frac(sin(dot(p, ...)) * 43758.5453): con coordenadas en píxeles el
 // argumento de sin() llega a ~150,000 y en varias GPUs (Intel, algunas AMD, OpenGL en general)
@@ -139,22 +156,28 @@ float sdRoundBox(float2 p, float2 b, float r)
     return length(max(q, float2(0.0, 0.0))) + min(max(q.x, q.y), 0.0) - r;
 }
 
-// Desenfoque en disco con 16 muestras en espiral (ángulo áureo)
+// Desenfoque en disco con 32 muestras en espiral (ángulo áureo) y peso gaussiano.
+// Por qué 32 y no 16: con radios grandes, 16 muestras quedan tan separadas que en vez de un
+// blur se ven "copias" nítidas superpuestas (bloques y rayas). El peso gaussiano hace que el
+// anillo exterior, que es el que más delata las copias, aporte poco, como un blur real.
 float3 sampleBlur(float2 uv, float radius_px, float rot_offset)
 {
     if (radius_px < 0.5)
         return image.Sample(textureSampler, uv).rgb;
 
     float3 acc = float3(0.0, 0.0, 0.0);
+    float w_sum = 0.0;
     float fi = 0.0;
-    for (int i = 0; i < 16; i++) {
+    for (int i = 0; i < 32; i++) {
         float a = fi * 2.39996323 + rot_offset;
-        float rr = sqrt((fi + 0.5) / 16.0) * radius_px;
-        float2 o = float2(cos(a), sin(a)) * rr * uv_pixel_interval;
-        acc += image.Sample(textureSampler, uv + o).rgb;
+        float t = sqrt((fi + 0.5) / 32.0);          // 0..1, reparto uniforme en el disco
+        float w = exp(-2.5 * t * t);                // gaussiana: el borde del disco pesa ~8%
+        float2 o = float2(cos(a), sin(a)) * (t * radius_px) * uv_pixel_interval;
+        acc += image.Sample(textureSampler, uv + o).rgb * w;
+        w_sum += w;
         fi += 1.0;
     }
-    return acc / 16.0;
+    return acc / w_sum;
 }
 
 float4 mainImage(VertData v_in) : TARGET
@@ -188,7 +211,10 @@ float4 mainImage(VertData v_in) : TARGET
 
     // 1 justo en el borde, 0 en la zona plana del centro
     float edge = 1.0 - saturate(-d / max(bezel, 1.0));
-    float lens = edge * edge;
+    // Perfil circular: 1 - sqrt(1 - edge²) es la "altura" de un cuarto de círculo; su pendiente
+    // se dispara en la orilla, que es donde iOS comprime el fondo.
+    float lens_circ = 1.0 - sqrt(saturate(1.0 - edge * edge));
+    float lens = lerp(edge * edge, lens_circ, bezel_profile);
 
     // Ondulación líquida opcional en el vidrio y la normal
     float2 wave_offset_px = float2(0.0, 0.0);
@@ -235,10 +261,11 @@ float4 mainImage(VertData v_in) : TARGET
     // Brillo especular en el borde según la dirección de la luz
     float ang = radians(light_angle + light_speed * elapsed_time);
     float2 L = float2(cos(ang), -sin(ang));
-    float facing = max(dot(n, L), 0.0) + 0.4 * max(dot(n, -L), 0.0);
+    // back_light reemplaza al 0.4 fijo: con 0 el reflejo queda solo del lado de la luz
+    float facing = max(dot(n, L), 0.0) + back_light * max(dot(n, -L), 0.0);
     float rim = pow(edge, 4.0) * facing;
     float edge_line = 1.0 - smoothstep(0.0, 1.5, -d);   // filo fino de 1-2 px
-    col += highlight * (rim * 0.45 + edge_line * 0.25 * (0.4 + facing));
+    col += highlight * (rim * 0.45 + edge_line * 0.25 * (back_light + facing));
 
     // Borde antialias
     float aa = saturate(0.5 - d);
