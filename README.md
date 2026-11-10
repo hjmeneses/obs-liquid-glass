@@ -16,6 +16,8 @@ Shaders para **OBS Studio** que imitan el efecto de vidrio líquido ("Liquid Gla
 | `liquid-glass.shader` | Panel de vidrio rectangular con esquinas redondeadas. Posición, tamaño y radio se ajustan con sliders. Para varios paneles, agrega el filtro varias veces. |
 | `liquid-glass-forma.shader` | La forma del vidrio la define **otra fuente o escena** (PNG con transparencia, texto, figuras…). Donde esa fuente es opaca (o blanca, en modo brillo) aparece vidrio que refracta la escena. |
 
+Las versiones en inglés están en la carpeta `en/`. Tienen el mismo código y los mismos nombres de parámetros, así que los presets funcionan con cualquiera de los dos idiomas.
+
 ## Instalación
 
 1. Descarga los archivos `.shader` (o clona el repo).
@@ -77,53 +79,63 @@ Shaders for **OBS Studio** that mimic the iOS "Liquid Glass" look: background bl
 - OBS Studio
 - [obs-shaderfilter](https://github.com/exeldro/obs-shaderfilter) plugin
 
-### Shaders
+### Files (English versions in `en/`)
+
+The `en/` folder has the English versions, with English slider labels and comments. The code is identical to the Spanish files in the root, and parameter names are the same, so presets and saved values work with either language.
 
 | File | What it does |
 |---|---|
-| `liquid-glass.shader` | Rounded-rectangle glass panel. Position, size and corner radius are slider controls. Add the filter multiple times for several panels. |
-| `liquid-glass-forma.shader` | The glass shape comes from **another source or scene** (transparent PNG, text, shapes…). Wherever that source is opaque (or white, in luminance mode) you get glass refracting the scene. |
+| `en/liquid-glass.shader` | Rounded-rectangle glass panel. Position, size and corner radius are slider controls. Add the filter multiple times for several panels. |
+| `en/liquid-glass-shape.shader` | The glass shape comes from **another source or scene** (transparent PNG, text, shapes…). Wherever that source is opaque (or white, in luminance mode) you get glass refracting the scene. |
+| `en/liquid-glass-presets.lua` | OBS script with one-click presets (see below). |
 
 ### Install
 
-1. Download the `.shader` files (or clone the repo).
+1. Download the files in `en/` (or clone the repo).
 2. In OBS, right-click a source or scene → **Filters** → **+** → **User-defined shader**.
 3. Enable **Load shader text from file** and pick the `.shader` file.
-4. Tweak the parameters (labels are in Spanish).
+4. Tweak the parameters.
 
-### Custom shape (`liquid-glass-forma.shader`)
+### Custom shape (`en/liquid-glass-shape.shader`)
 
 1. Create a separate scene, e.g. "Glass Shape", containing the shapes you want as glass. It doesn't need to go live.
-2. Add the filter with `liquid-glass-forma.shader` to your main scene.
-3. Set **Fuente de forma** (shape source) to that scene.
-4. If your shape is white-on-black instead of using transparency, enable **Usar brillo en vez de transparencia** (use luminance).
+2. Add the filter with `en/liquid-glass-shape.shader` to your main scene.
+3. Set **Shape source** to that scene.
+4. If your shape is white-on-black instead of using transparency, enable **Use luminance instead of alpha**.
 
 **Tip:** the filter can only refract what's inside the source it's applied to. To refract everything behind it, apply it to the whole scene (or a canvas-sized group).
 
 ### Main parameters
 
-| Parameter (label in OBS) | Effect |
+| Parameter | Effect |
 |---|---|
-| Blur (*Desenfoque*) | Blur radius of the content behind the glass |
-| Refraction (*Refracción*) | Bezel displacement; negative = magnifier effect |
-| Bezel width (*Ancho del bisel*) | How wide the curved edge zone is |
-| Color dispersion (*Dispersión de color*) | RGB split at the bezel (chromatic aberration) |
-| Saturation / Tint (*Saturación / Tinte*) | Glass color |
-| Rim highlight / Light angle (*Brillo de borde / Ángulo de la luz*) | Specular reflection; *Giro de la luz* animates it |
-| Shadow (*Sombra*) | Drop shadow opacity and size |
-| Liquid wave / Speed (*Ondulación líquida / Velocidad*) | Animated organic distortion of the glass and its reflections |
-| Frost grain (*Grano de escarcha*) | Subtle frosted texture and randomized blur scattering |
-| Bezel profile (*Perfil del bisel*) | 0 = soft curve; 1 = iOS-like convex, squeezes the background at the rim |
-| Bezel tint (*Tinte en el bisel*) | 1 = tint fades out at the edge (key for dark glass) |
-| Back light (*Luz del lado opuesto*) | Highlight on the rim side facing away from the light |
+| Blur | Blur radius of the content behind the glass |
+| Refraction | Bezel displacement; negative = magnifier effect |
+| Bezel width | How wide the curved edge zone is |
+| Color dispersion | RGB split at the bezel (chromatic aberration) |
+| Saturation / Tint | Glass color |
+| Rim highlight / Light angle | Specular reflection; *Light rotation* animates it |
+| Shadow | Drop shadow opacity and size |
+| Liquid wave / Wave speed | Animated organic distortion of the glass and its reflections |
+| Frost grain | Subtle frosted texture and randomized blur scattering |
+| Bezel profile | 0 = soft curve; 1 = iOS-like convex, squeezes the background at the rim |
+| Bezel tint | 1 = tint fades out at the edge (key for dark glass) |
+| Back light | Highlight on the rim side facing away from the light |
 
 ### Presets with buttons (script)
 
-`liquid-glass-presets.lua` adds one-click iOS-style presets. It writes the values into the filter, so the sliders stay adjustable.
+`en/liquid-glass-presets.lua` adds one-click iOS-style presets. It writes the values into the filter, so the sliders stay adjustable.
 
-1. **Tools → Scripts → +** and pick `liquid-glass-presets.lua`.
-2. Choose your filter under **Filtro de vidrio** (use **Actualizar lista** if it's missing).
-3. Click a preset: **Control** (Control Center buttons), **Barra oscura** (dark search bar / Siri), **Panel grande** (folders), **Objeto grande** (large decorative shapes and logos, 400 px+).
+1. **Tools → Scripts → +** and pick `en/liquid-glass-presets.lua`.
+2. Choose your filter under **Glass filter** (use **Refresh list** if it's missing).
+3. Click a preset:
+
+| Preset | Based on | Look |
+|---|---|---|
+| Control | Control Center buttons | Almost no tint, heavily blurred background, highlight on two sides |
+| Dark bar | Search bar / Siri | Near-black center; the bezel shows the refracted background |
+| Large panel | Folders | Strong blur, light dark tint, thin bezel |
+| Large object | Decorative shapes and logos (400 px+) | Wide bezel, strong refraction, little blur: a thick piece of glass |
 
 You can also save your current values under a name and reuse them on other filters. If the filter's properties window was open, reopen it to see the updated sliders.
 

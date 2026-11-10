@@ -120,8 +120,9 @@ uniform float tint_edge<
     float minimum = 0.0; float maximum = 1.0; float step = 0.01;
 > = 0.0;
 
-// Cuánto brillo recibe el lado del borde opuesto a la luz. Antes era un 0.4 fijo, lo que
-// iluminaba todo el contorno; en iOS el reflejo está casi solo del lado de la luz (usa ~0).
+// Cuánto brillo recibe el lado del borde opuesto a la luz. Antes era un 0.4 fijo. iOS varía:
+// los botones del Centro de control iluminan dos lados opuestos (~0.7) y las barras oscuras
+// apenas el lado contrario (~0.3). 0 = brillo solo del lado de la luz.
 uniform float back_light<
     string label = "Luz del lado opuesto";
     string widget_type = "slider";

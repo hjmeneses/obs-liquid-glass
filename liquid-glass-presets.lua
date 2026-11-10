@@ -113,7 +113,8 @@ local function scan_source(src, list, seen)
             obs.obs_data_release(fs)
             if file:find("liquid%-glass") then
                 local fname = obs.obs_source_get_name(f)
-                local kind = file:find("forma") and "  (forma)" or "  (panel)"
+                -- "forma" = shader en español, "shape" = versión en inglés (en/)
+                local kind = (file:find("forma") or file:find("shape")) and "  (forma)" or "  (panel)"
                 local value = sname .. "\t" .. fname
                 obs.obs_property_list_add_string(list, sname .. "  →  " .. fname .. kind, value)
                 if g_first_target == "" then g_first_target = value end
