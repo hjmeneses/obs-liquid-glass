@@ -33,6 +33,29 @@ uniform float refraction<
     float minimum = -150.0; float maximum = 150.0; float step = 1.0;
 > = 45.0;
 
+// Zoom de todo el interior hacia un punto, como una lente gruesa. Distinto de la refracción,
+// que solo deforma el bisel. 1 = sin zoom; 1.03–1.08 es sutil y se ve natural.
+// Por qué el centro es un slider: la forma viene de otra fuente y el shader no sabe dónde está.
+// Calcular su centro en cada píxel costaría cientos de lecturas. Ponlo en el centro de tu figura;
+// con varias figuras en la misma fuente de forma, todas se amplían hacia ese mismo punto.
+uniform float magnification<
+    string label = "Magnificacion del interior";
+    string widget_type = "slider";
+    float minimum = 0.8; float maximum = 1.5; float step = 0.01;
+> = 1.0;
+
+uniform float mag_center_x<
+    string label = "Centro de magnificacion X (%)";
+    string widget_type = "slider";
+    float minimum = 0.0; float maximum = 100.0; float step = 0.1;
+> = 50.0;
+
+uniform float mag_center_y<
+    string label = "Centro de magnificacion Y (%)";
+    string widget_type = "slider";
+    float minimum = 0.0; float maximum = 100.0; float step = 0.1;
+> = 50.0;
+
 uniform float dispersion<
     string label = "Dispersion de color";
     string widget_type = "slider";
@@ -263,6 +286,11 @@ float4 mainImage(VertData v_in) : TARGET
     float2 disp_px = n * (refraction * lens) + wave_offset_px;
     float2 disp = disp_px * uv_pixel_interval;
 
+    // Magnificación: el píxel muestra el fondo en un punto más cercano al centro elegido, así el
+    // interior se ve ampliado. Con 1.0 queda uv exacto.
+    float2 mag_c = float2(mag_center_x, mag_center_y) * 0.01 * uv_size;
+    float2 uv_in = uv - (pos - mag_c) * (1.0 - 1.0 / max(magnification, 0.01)) * uv_pixel_interval;
+
     // Ruido por píxel para escarcha (rota el disco de desenfoque y añade grano sutil)
     // Aquí el grano usa pos (absoluto en pantalla) a propósito: la forma viene de otra fuente y el
     // shader no sabe dónde está ni cómo se mueve, así que no hay un origen local al cual anclarlo.
@@ -273,11 +301,11 @@ float4 mainImage(VertData v_in) : TARGET
     // Optimización: 1 sola pasada de blur si no hay dispersión perceptible en este píxel
     float3 col;
     if (dispersion < 0.001 || length(disp_px) * dispersion < 0.15) {
-        col = sceneBlur(uv + disp, blur_radius, rot);
+        col = sceneBlur(uv_in + disp, blur_radius, rot);
     } else {
-        col.r = sceneBlur(uv + disp * (1.0 + dispersion), blur_radius, rot).r;
-        col.g = sceneBlur(uv + disp, blur_radius, rot).g;
-        col.b = sceneBlur(uv + disp * (1.0 - dispersion), blur_radius, rot).b;
+        col.r = sceneBlur(uv_in + disp * (1.0 + dispersion), blur_radius, rot).r;
+        col.g = sceneBlur(uv_in + disp, blur_radius, rot).g;
+        col.b = sceneBlur(uv_in + disp * (1.0 - dispersion), blur_radius, rot).b;
     }
 
     // Saturación, tinte y grano de escarcha

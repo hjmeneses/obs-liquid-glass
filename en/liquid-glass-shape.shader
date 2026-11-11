@@ -33,6 +33,29 @@ uniform float refraction<
     float minimum = -150.0; float maximum = 150.0; float step = 1.0;
 > = 45.0;
 
+// Zooms the whole interior toward a point, like a thick lens. Unlike refraction, which only
+// bends the bezel. 1 = no zoom; 1.03–1.08 is subtle and looks natural.
+// Why the center is a slider: the shape comes from another source and the shader doesn't know
+// where it is. Computing its center per pixel would take hundreds of reads. Put it at the
+// center of your shape; with several shapes in one shape source, they all zoom toward that point.
+uniform float magnification<
+    string label = "Interior magnification";
+    string widget_type = "slider";
+    float minimum = 0.8; float maximum = 1.5; float step = 0.01;
+> = 1.0;
+
+uniform float mag_center_x<
+    string label = "Magnification center X (%)";
+    string widget_type = "slider";
+    float minimum = 0.0; float maximum = 100.0; float step = 0.1;
+> = 50.0;
+
+uniform float mag_center_y<
+    string label = "Magnification center Y (%)";
+    string widget_type = "slider";
+    float minimum = 0.0; float maximum = 100.0; float step = 0.1;
+> = 50.0;
+
 uniform float dispersion<
     string label = "Color dispersion";
     string widget_type = "slider";
@@ -263,6 +286,11 @@ float4 mainImage(VertData v_in) : TARGET
     float2 disp_px = n * (refraction * lens) + wave_offset_px;
     float2 disp = disp_px * uv_pixel_interval;
 
+    // Magnification: the pixel shows the background at a point closer to the chosen center, so
+    // the interior looks enlarged. At 1.0 this is exactly uv.
+    float2 mag_c = float2(mag_center_x, mag_center_y) * 0.01 * uv_size;
+    float2 uv_in = uv - (pos - mag_c) * (1.0 - 1.0 / max(magnification, 0.01)) * uv_pixel_interval;
+
     // Per-pixel noise for frost (rotates the blur disc and adds subtle grain).
     // Here the grain uses pos (absolute on screen) on purpose: the shape comes from another source
     // and the shader doesn't know where it is or how it moves, so there's no local origin to anchor to.
@@ -273,11 +301,11 @@ float4 mainImage(VertData v_in) : TARGET
     // Optimization: a single blur pass when this pixel has no visible dispersion
     float3 col;
     if (dispersion < 0.001 || length(disp_px) * dispersion < 0.15) {
-        col = sceneBlur(uv + disp, blur_radius, rot);
+        col = sceneBlur(uv_in + disp, blur_radius, rot);
     } else {
-        col.r = sceneBlur(uv + disp * (1.0 + dispersion), blur_radius, rot).r;
-        col.g = sceneBlur(uv + disp, blur_radius, rot).g;
-        col.b = sceneBlur(uv + disp * (1.0 - dispersion), blur_radius, rot).b;
+        col.r = sceneBlur(uv_in + disp * (1.0 + dispersion), blur_radius, rot).r;
+        col.g = sceneBlur(uv_in + disp, blur_radius, rot).g;
+        col.b = sceneBlur(uv_in + disp * (1.0 - dispersion), blur_radius, rot).b;
     }
 
     // Saturation, tint and frost grain

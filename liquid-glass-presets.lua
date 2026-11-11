@@ -21,7 +21,7 @@ local KEYS = {
     "blur_radius", "refraction", "bezel", "bezel_profile", "dispersion", "saturation",
     "tint_amount", "tint_edge", "highlight", "light_angle", "light_speed", "back_light",
     "shadow_opacity", "shadow_size", "liquid_wave", "frost_amount",
-    "squircle", "magnification",   -- solo existen en liquid-glass.shader; la forma los ignora
+    "squircle", "magnification",   -- squircle solo existe en liquid-glass.shader; la forma lo ignora
 }
 -- Los colores float4 de obs-shaderfilter se guardan como entero 0xAABBGGRR, no como double
 local COLOR_KEYS = { "tint_color" }
