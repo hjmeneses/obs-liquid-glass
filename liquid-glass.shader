@@ -33,6 +33,23 @@ uniform float corner_radius<
     float minimum = 0.0; float maximum = 500.0; float step = 1.0;
 > = 60.0;
 
+// Exponente de superelipse en las esquinas. 2 = arco circular (rectángulo redondeado normal);
+// 4–6 = esquina "continua" estilo Apple (squircle): la curva arranca antes y más suave, sin el
+// quiebre visible donde el lado recto se junta con el arco. Para una cápsula (barra) deja 2.
+uniform float squircle<
+    string label = "Forma de esquina (2 circular, 5 squircle iOS)";
+    string widget_type = "slider";
+    float minimum = 2.0; float maximum = 8.0; float step = 0.1;
+> = 2.0;
+
+// Ancho de la transición en la orilla. 1 = antialias normal; más alto suaviza el contorno
+// (útil a 4K o si el panel se escala).
+uniform float edge_feather<
+    string label = "Suavizado del borde (px)";
+    string widget_type = "slider";
+    float minimum = 1.0; float maximum = 20.0; float step = 0.1;
+> = 1.0;
+
 uniform float blur_radius<
     string label = "Desenfoque (px)";
     string widget_type = "slider";
@@ -44,6 +61,14 @@ uniform float refraction<
     string widget_type = "slider";
     float minimum = -150.0; float maximum = 150.0; float step = 1.0;
 > = 45.0;
+
+// Zoom de todo el interior hacia el centro del panel, como una lente gruesa. Distinto de la
+// refracción, que solo deforma el bisel. 1 = sin zoom; 1.03–1.08 es sutil y se ve natural.
+uniform float magnification<
+    string label = "Magnificacion del interior";
+    string widget_type = "slider";
+    float minimum = 0.8; float maximum = 1.5; float step = 0.01;
+> = 1.0;
 
 uniform float bezel<
     string label = "Ancho del bisel (px)";
@@ -160,11 +185,28 @@ float hash12(float2 p)
     return frac((p3.x + p3.y) * p3.z);
 }
 
-// Distancia con signo a un rectángulo redondeado (negativa adentro)
-float sdRoundBox(float2 p, float2 b, float r)
+// Norma Ln de un vector con componentes >= 0: (x^n + y^n)^(1/n). Con n = 2 es length().
+// Se divide entre la componente mayor antes de elevar para no perder precisión con
+// valores chicos (0.01^8 ya se pierde en float).
+float lengthN(float2 q, float n)
+{
+    float m = max(q.x, q.y);
+    if (m < 0.0001)
+        return 0.0;
+    float2 u = q / m;
+    return m * pow(pow(u.x, n) + pow(u.y, n), 1.0 / n);
+}
+
+// Distancia con signo a un rectángulo de esquinas redondeadas (negativa adentro).
+// sq = exponente de la esquina: 2 = arco circular, >2 = superelipse (squircle).
+// Con sq > 2 la distancia es aproximada (hasta ~25% de error en la diagonal con sq = 6), lo
+// cual no se nota: solo se usa para el antialias, el ancho del bisel y la sombra.
+float sdRoundBox(float2 p, float2 b, float r, float sq)
 {
     float2 q = abs(p) - b + float2(r, r);
-    return length(max(q, float2(0.0, 0.0))) + min(max(q.x, q.y), 0.0) - r;
+    float2 qc = max(q, float2(0.0, 0.0));
+    float corner = (sq <= 2.001) ? length(qc) : lengthN(qc, sq);
+    return corner + min(max(q.x, q.y), 0.0) - r;
 }
 
 // Desenfoque en disco con 32 muestras en espiral (ángulo áureo) y peso gaussiano.
@@ -201,14 +243,16 @@ float4 mainImage(VertData v_in) : TARGET
     float2 half_size = float2(panel_w, panel_h) * 0.005 * uv_size;
     float r = min(corner_radius, min(half_size.x, half_size.y));
     float2 p = pos - center;
-    float d = sdRoundBox(p, half_size, r);
+    float sq = max(squircle, 2.0);
+    float d = sdRoundBox(p, half_size, r, sq);
 
     // Fuera del panel: sombra suave desplazada hacia abajo
-    float ds = sdRoundBox(p - float2(0.0, shadow_size * 0.35), half_size, r);
+    float ds = sdRoundBox(p - float2(0.0, shadow_size * 0.35), half_size, r, sq);
     float sh = (1.0 - smoothstep(0.0, max(shadow_size, 0.001), ds)) * shadow_opacity;
     float3 outside = base.rgb * (1.0 - sh);
 
-    if (d > 1.0)
+    float feather = max(edge_feather, 1.0);
+    if (d > 0.5 * feather + 0.5)
         return float4(outside, base.a);
 
     // Normal analítica suave del bisel (evita 4 llamadas extra a sdRoundBox y pliegues a 45°)
@@ -216,7 +260,10 @@ float4 mainImage(VertData v_in) : TARGET
     float2 q_n = abs(p) - half_size + float2(r_bezel, r_bezel);
     float2 n_corner = max(q_n, float2(0.0, 0.0));
     float2 n_inside = (q_n.x > q_n.y) ? float2(1.0, 0.0) : float2(0.0, 1.0);
-    float2 n_dir = (length(n_corner) > 0.0001) ? n_corner : n_inside;
+    // Gradiente de la superelipse: q^(sq-1). Con sq = 2 es q, igual que antes.
+    // Se normaliza por la componente mayor antes del pow por la misma razón que en lengthN.
+    float m_c = max(n_corner.x, n_corner.y);
+    float2 n_dir = (m_c > 0.0001) ? pow(n_corner / m_c, sq - 1.0) : n_inside;
     float2 sgn = float2(p.x >= 0.0 ? 1.0 : -1.0, p.y >= 0.0 ? 1.0 : -1.0);
     float2 n = (n_dir * sgn) / max(length(n_dir), 0.0001);
 
@@ -245,6 +292,10 @@ float4 mainImage(VertData v_in) : TARGET
     float2 disp_px = n * (refraction * lens) + wave_offset_px;
     float2 disp = disp_px * uv_pixel_interval;
 
+    // Magnificación: el punto p del vidrio muestra el fondo en p / magnification (más cerca del
+    // centro del panel), así el interior se ve ampliado. Con 1.0 queda uv exacto.
+    float2 uv_in = uv - p * (1.0 - 1.0 / max(magnification, 0.01)) * uv_pixel_interval;
+
     // Ruido por píxel para escarcha (rota el disco de desenfoque y añade grano sutil)
     // Se usa p (relativo al centro del panel) y no pos (absoluto en pantalla) para que el grano
     // quede "pegado" al vidrio: si el panel se anima (Move Transition, etc.), la escarcha se mueve
@@ -255,11 +306,11 @@ float4 mainImage(VertData v_in) : TARGET
     // Optimización: 1 sola pasada de blur si no hay dispersión perceptible en este píxel
     float3 col;
     if (dispersion < 0.001 || length(disp_px) * dispersion < 0.15) {
-        col = sampleBlur(uv + disp, blur_radius, rot);
+        col = sampleBlur(uv_in + disp, blur_radius, rot);
     } else {
-        col.r = sampleBlur(uv + disp * (1.0 + dispersion), blur_radius, rot).r;
-        col.g = sampleBlur(uv + disp, blur_radius, rot).g;
-        col.b = sampleBlur(uv + disp * (1.0 - dispersion), blur_radius, rot).b;
+        col.r = sampleBlur(uv_in + disp * (1.0 + dispersion), blur_radius, rot).r;
+        col.g = sampleBlur(uv_in + disp, blur_radius, rot).g;
+        col.b = sampleBlur(uv_in + disp * (1.0 - dispersion), blur_radius, rot).b;
     }
 
     // Saturación, tinte y grano de escarcha
@@ -279,7 +330,7 @@ float4 mainImage(VertData v_in) : TARGET
     float edge_line = 1.0 - smoothstep(0.0, 1.5, -d);   // filo fino de 1-2 px
     col += highlight * (rim * 0.45 + edge_line * 0.25 * (back_light + facing));
 
-    // Borde antialias
-    float aa = saturate(0.5 - d);
+    // Borde antialias; con edge_feather > 1 la transición se reparte en más píxeles
+    float aa = saturate(0.5 - d / feather);
     return float4(lerp(outside, saturate(col), aa), base.a);
 }

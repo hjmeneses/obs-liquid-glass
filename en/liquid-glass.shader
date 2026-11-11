@@ -33,6 +33,23 @@ uniform float corner_radius<
     float minimum = 0.0; float maximum = 500.0; float step = 1.0;
 > = 60.0;
 
+// Superellipse exponent for the corners. 2 = circular arc (regular rounded rectangle);
+// 4–6 = Apple-style "continuous" corner (squircle): the curve starts earlier and softer, with
+// no visible kink where the straight side meets the arc. Keep 2 for a capsule (bar).
+uniform float squircle<
+    string label = "Corner shape (2 circular, 5 iOS squircle)";
+    string widget_type = "slider";
+    float minimum = 2.0; float maximum = 8.0; float step = 0.1;
+> = 2.0;
+
+// Width of the edge transition. 1 = regular antialiasing; higher values soften the outline
+// (useful at 4K or when the panel is scaled).
+uniform float edge_feather<
+    string label = "Edge feathering (px)";
+    string widget_type = "slider";
+    float minimum = 1.0; float maximum = 20.0; float step = 0.1;
+> = 1.0;
+
 uniform float blur_radius<
     string label = "Blur (px)";
     string widget_type = "slider";
@@ -44,6 +61,14 @@ uniform float refraction<
     string widget_type = "slider";
     float minimum = -150.0; float maximum = 150.0; float step = 1.0;
 > = 45.0;
+
+// Zooms the whole interior toward the panel center, like a thick lens. Unlike refraction,
+// which only bends the bezel. 1 = no zoom; 1.03–1.08 is subtle and looks natural.
+uniform float magnification<
+    string label = "Interior magnification";
+    string widget_type = "slider";
+    float minimum = 0.8; float maximum = 1.5; float step = 0.01;
+> = 1.0;
 
 uniform float bezel<
     string label = "Bezel width (px)";
@@ -160,11 +185,28 @@ float hash12(float2 p)
     return frac((p3.x + p3.y) * p3.z);
 }
 
-// Signed distance to a rounded rectangle (negative inside)
-float sdRoundBox(float2 p, float2 b, float r)
+// Ln norm of a vector with components >= 0: (x^n + y^n)^(1/n). With n = 2 it is length().
+// Divides by the largest component before raising to avoid losing precision on small
+// values (0.01^8 already underflows in float).
+float lengthN(float2 q, float n)
+{
+    float m = max(q.x, q.y);
+    if (m < 0.0001)
+        return 0.0;
+    float2 u = q / m;
+    return m * pow(pow(u.x, n) + pow(u.y, n), 1.0 / n);
+}
+
+// Signed distance to a rectangle with rounded corners (negative inside).
+// sq = corner exponent: 2 = circular arc, >2 = superellipse (squircle).
+// With sq > 2 the distance is approximate (up to ~25% off on the diagonal at sq = 6), which
+// isn't noticeable: it is only used for antialiasing, bezel width and the shadow.
+float sdRoundBox(float2 p, float2 b, float r, float sq)
 {
     float2 q = abs(p) - b + float2(r, r);
-    return length(max(q, float2(0.0, 0.0))) + min(max(q.x, q.y), 0.0) - r;
+    float2 qc = max(q, float2(0.0, 0.0));
+    float corner = (sq <= 2.001) ? length(qc) : lengthN(qc, sq);
+    return corner + min(max(q.x, q.y), 0.0) - r;
 }
 
 // Disc blur with 32 samples on a golden-angle spiral and Gaussian weights.
@@ -201,14 +243,16 @@ float4 mainImage(VertData v_in) : TARGET
     float2 half_size = float2(panel_w, panel_h) * 0.005 * uv_size;
     float r = min(corner_radius, min(half_size.x, half_size.y));
     float2 p = pos - center;
-    float d = sdRoundBox(p, half_size, r);
+    float sq = max(squircle, 2.0);
+    float d = sdRoundBox(p, half_size, r, sq);
 
     // Outside the panel: soft shadow shifted downward
-    float ds = sdRoundBox(p - float2(0.0, shadow_size * 0.35), half_size, r);
+    float ds = sdRoundBox(p - float2(0.0, shadow_size * 0.35), half_size, r, sq);
     float sh = (1.0 - smoothstep(0.0, max(shadow_size, 0.001), ds)) * shadow_opacity;
     float3 outside = base.rgb * (1.0 - sh);
 
-    if (d > 1.0)
+    float feather = max(edge_feather, 1.0);
+    if (d > 0.5 * feather + 0.5)
         return float4(outside, base.a);
 
     // Smooth analytic bezel normal (avoids 4 extra sdRoundBox calls and 45° creases)
@@ -216,7 +260,10 @@ float4 mainImage(VertData v_in) : TARGET
     float2 q_n = abs(p) - half_size + float2(r_bezel, r_bezel);
     float2 n_corner = max(q_n, float2(0.0, 0.0));
     float2 n_inside = (q_n.x > q_n.y) ? float2(1.0, 0.0) : float2(0.0, 1.0);
-    float2 n_dir = (length(n_corner) > 0.0001) ? n_corner : n_inside;
+    // Superellipse gradient: q^(sq-1). With sq = 2 it is q, same as before.
+    // Normalized by the largest component before pow, for the same reason as in lengthN.
+    float m_c = max(n_corner.x, n_corner.y);
+    float2 n_dir = (m_c > 0.0001) ? pow(n_corner / m_c, sq - 1.0) : n_inside;
     float2 sgn = float2(p.x >= 0.0 ? 1.0 : -1.0, p.y >= 0.0 ? 1.0 : -1.0);
     float2 n = (n_dir * sgn) / max(length(n_dir), 0.0001);
 
@@ -245,6 +292,10 @@ float4 mainImage(VertData v_in) : TARGET
     float2 disp_px = n * (refraction * lens) + wave_offset_px;
     float2 disp = disp_px * uv_pixel_interval;
 
+    // Magnification: point p on the glass shows the background at p / magnification (closer to
+    // the panel center), so the interior looks enlarged. At 1.0 this is exactly uv.
+    float2 uv_in = uv - p * (1.0 - 1.0 / max(magnification, 0.01)) * uv_pixel_interval;
+
     // Per-pixel noise for frost (rotates the blur disc and adds subtle grain).
     // Uses p (relative to the panel center), not pos (absolute on screen), so the grain sticks
     // to the glass: if the panel is animated (Move Transition, etc.) the frost moves with it
@@ -255,11 +306,11 @@ float4 mainImage(VertData v_in) : TARGET
     // Optimization: a single blur pass when this pixel has no visible dispersion
     float3 col;
     if (dispersion < 0.001 || length(disp_px) * dispersion < 0.15) {
-        col = sampleBlur(uv + disp, blur_radius, rot);
+        col = sampleBlur(uv_in + disp, blur_radius, rot);
     } else {
-        col.r = sampleBlur(uv + disp * (1.0 + dispersion), blur_radius, rot).r;
-        col.g = sampleBlur(uv + disp, blur_radius, rot).g;
-        col.b = sampleBlur(uv + disp * (1.0 - dispersion), blur_radius, rot).b;
+        col.r = sampleBlur(uv_in + disp * (1.0 + dispersion), blur_radius, rot).r;
+        col.g = sampleBlur(uv_in + disp, blur_radius, rot).g;
+        col.b = sampleBlur(uv_in + disp * (1.0 - dispersion), blur_radius, rot).b;
     }
 
     // Saturation, tint and frost grain
@@ -279,7 +330,7 @@ float4 mainImage(VertData v_in) : TARGET
     float edge_line = 1.0 - smoothstep(0.0, 1.5, -d);   // thin 1-2 px edge line
     col += highlight * (rim * 0.45 + edge_line * 0.25 * (back_light + facing));
 
-    // Antialiased edge
-    float aa = saturate(0.5 - d);
+    // Antialiased edge; with edge_feather > 1 the transition spreads over more pixels
+    float aa = saturate(0.5 - d / feather);
     return float4(lerp(outside, saturate(col), aa), base.a);
 }

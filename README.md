@@ -50,6 +50,9 @@ Las versiones en inglés están en la carpeta `en/`. Tienen el mismo código y l
 | Perfil del bisel | 0 = curva suave; 1 = convexo tipo iOS, comprime el fondo junto a la orilla |
 | Tinte en el bisel | 1 = el tinte se desvanece en el borde (clave para vidrio oscuro) |
 | Luz del lado opuesto | Brillo en el lado del borde contrario a la luz |
+| Forma de esquina | 2 = esquina circular; 4–6 = squircle (esquina continua estilo iOS). Solo en `liquid-glass.shader` |
+| Magnificación del interior | Zoom de todo el interior hacia el centro, como lente gruesa (1.03–1.08 es sutil). Solo en `liquid-glass.shader` |
+| Suavizado del borde | Ancho de la transición en la orilla, útil a 4K. Solo en `liquid-glass.shader` |
 
 ## Presets con botones (script)
 
@@ -121,6 +124,9 @@ The `en/` folder has the English versions, with English slider labels and commen
 | Bezel profile | 0 = soft curve; 1 = iOS-like convex, squeezes the background at the rim |
 | Bezel tint | 1 = tint fades out at the edge (key for dark glass) |
 | Back light | Highlight on the rim side facing away from the light |
+| Corner shape | 2 = circular corner; 4–6 = squircle (iOS-style continuous corner). `liquid-glass.shader` only |
+| Interior magnification | Zooms the whole interior toward the center, like a thick lens (1.03–1.08 is subtle). `liquid-glass.shader` only |
+| Edge feathering | Width of the edge transition, useful at 4K. `liquid-glass.shader` only |
 
 ### Presets with buttons (script)
 

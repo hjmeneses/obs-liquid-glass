@@ -23,6 +23,7 @@ local KEYS = {
     "blur_radius", "refraction", "bezel", "bezel_profile", "dispersion", "saturation",
     "tint_amount", "tint_edge", "highlight", "light_angle", "light_speed", "back_light",
     "shadow_opacity", "shadow_size", "liquid_wave", "frost_amount",
+    "squircle", "magnification",   -- only exist in liquid-glass.shader; the shape shader ignores them
 }
 -- obs-shaderfilter stores float4 colors as a 0xAABBGGRR integer, not as a double
 local COLOR_KEYS = { "tint_color" }
@@ -42,6 +43,7 @@ local PRESETS = {
             saturation = 1.4, tint_amount = 0.08, tint_edge = 0.5, highlight = 0.9,
             light_angle = 135, light_speed = 0, back_light = 0.75,
             shadow_opacity = 0.0, shadow_size = 20, liquid_wave = 0, frost_amount = 0,
+            squircle = 5,   -- continuous corners, like iOS buttons
         },
         colors = { tint_color = WHITE },
     },
@@ -67,6 +69,7 @@ local PRESETS = {
             saturation = 1.5, tint_amount = 0.2, tint_edge = 0.6, highlight = 0.6,
             light_angle = 135, light_speed = 0, back_light = 0.7,
             shadow_opacity = 0.1, shadow_size = 30, liquid_wave = 0, frost_amount = 0,
+            squircle = 5,
         },
         colors = { tint_color = BLACK },
     },
