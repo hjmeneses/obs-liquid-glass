@@ -152,6 +152,13 @@ uniform float back_light<
     float minimum = 0.0; float maximum = 1.0; float step = 0.01;
 > = 0.4;
 
+// Bisel suave: mide la distancia a la orilla con rayos en vez de promediar la forma en 32 puntos.
+// Quita las facetas que salen en formas curvas con bisel ancho, a cambio de ~97 lecturas de la
+// forma por píxel de vidrio en lugar de 33. Desactívalo si tu PC va justa.
+uniform bool smooth_bevel<
+    string label = "Bisel suave (sin facetas, mas lecturas)";
+> = true;
+
 // Hash rápido sin texturas para rotación de muestras y efecto escarcha.
 // Por qué no el clásico frac(sin(dot(p, ...)) * 43758.5453): con coordenadas en píxeles el
 // argumento de sin() llega a ~150,000 y en varias GPUs (Intel, algunas AMD, OpenGL en general)
@@ -213,6 +220,95 @@ float3 bevelAt(float2 uv, float radius_px)
     return float3(n.x, n.y, h);
 }
 
+// Igual que shapeAt pero sin derivadas implícitas, para leer dentro de ramas y bucles con salida
+// temprana (Sample ahí da resultados indefinidos en algunas GPUs).
+float shapeAtLod(float2 uv)
+{
+    float4 s = shape_source.SampleLevel(textureSampler, uv, 0.0);
+    if (use_luminance)
+        return saturate(dot(s.rgb, float3(0.2126, 0.7152, 0.0722)));
+    return s.a;
+}
+
+// Bisel por distancia a la orilla: normal exterior (xy) y distancia en píxeles (z).
+// Por qué: bevelAt lee la forma en 32 puntos fijos y cada uno cambia de golpe al cruzar la orilla,
+// así que altura y normal avanzan a escalones; en formas curvas con bisel ancho se ven facetas.
+// Aquí cada uno de los 12 rayos busca dónde la cobertura cruza 0.5 (4 pasos gruesos, 4 de
+// bisección y una interpolación lineal), lo que da una distancia continua con precisión de
+// subpíxel. La distancia es un mínimo suave de los rayos y la normal, el promedio de las
+// direcciones más cercanas a la orilla. Todo varía de forma continua: no hay escalones.
+// El mínimo suave se acumula sobre la marcha (sin arreglo): cuando aparece un rayo más corto, los
+// acumuladores se reescalan. Sin #define, [unroll] ni arreglos locales, que el traductor de efectos
+// de OBS (sobre todo a GLSL en Mac y Linux) no siempre acepta.
+float3 bevelRays(float2 uv, float radius_px)
+{
+    float step_len = radius_px * 0.25;
+    float kd = 0.04 * radius_px + 1.0;      // suavidad del mínimo para la distancia (px)
+    float kn = 0.15 * radius_px + 1.0;      // suavidad para la normal (más ancha = más lisa)
+    float r_min = radius_px;
+    float d_acc = 0.0;
+    float wd_sum = 0.0;
+    float2 n_acc = float2(0.0, 0.0);
+    float fk = 0.0;
+
+    for (int k = 0; k < 12; k++) {
+        float a = (fk + 0.5) * 0.52359878;   // 2π / 12
+        float2 u = float2(cos(a), sin(a));
+        float2 dir = u * uv_pixel_interval;
+        float lo = 0.0;
+        float hi = radius_px;
+        float s_lo = 1.0;
+        float s_hi = 0.0;
+        float prev = 1.0;
+        bool found = false;
+        // Pasos gruesos: primer punto del rayo que ya está fuera de la forma
+        float fj = 1.0;
+        for (int j = 0; j < 4; j++) {
+            if (!found) {
+                float s = shapeAtLod(uv + dir * (step_len * fj));
+                if (s < 0.5) {
+                    found = true;
+                    lo = step_len * (fj - 1.0);
+                    hi = step_len * fj;
+                    s_lo = prev;
+                    s_hi = s;
+                }
+                prev = s;
+            }
+            fj += 1.0;
+        }
+        float r = radius_px;   // sin orilla en este rayo dentro del bisel
+        if (found) {
+            for (int b = 0; b < 4; b++) {
+                float mid = 0.5 * (lo + hi);
+                float s = shapeAtLod(uv + dir * mid);
+                if (s >= 0.5) { lo = mid; s_lo = s; } else { hi = mid; s_hi = s; }
+            }
+            // Interpolación lineal dentro del último tramo: precisión de subpíxel
+            r = lo + (hi - lo) * saturate((s_lo - 0.5) / max(s_lo - s_hi, 0.0001));
+        }
+
+        // Mínimo suave acumulado: los rayos casi tan cortos como el mínimo también cuentan, así no
+        // hay saltos cuando cambia cuál es el más corto. Si este rayo es el nuevo mínimo, lo que ya
+        // se acumuló se reescala como si se hubiera pesado contra él desde el principio.
+        if (r < r_min) {
+            d_acc *= exp(-(r_min - r) / kd);
+            wd_sum *= exp(-(r_min - r) / kd);
+            n_acc *= exp(-(r_min - r) / kn);
+            r_min = r;
+        }
+        float wd = exp(-(r - r_min) / kd);
+        d_acc += wd * r;
+        wd_sum += wd;
+        // Los rayos que no encontraron orilla no votan por la dirección
+        if (found)
+            n_acc += u * exp(-(r - r_min) / kn);
+        fk += 1.0;
+    }
+    float2 n = n_acc / max(length(n_acc), 0.0001);
+    return float3(n.x, n.y, d_acc / wd_sum);
+}
+
 // Desenfoque de la escena principal: 32 muestras en espiral con peso gaussiano.
 // Por qué 32 y no 16: con radios grandes, 16 muestras quedan tan separadas que en vez de un
 // blur se ven "copias" nítidas superpuestas (bloques y rayas). El peso gaussiano hace que el
@@ -252,12 +348,20 @@ float4 mainImage(VertData v_in) : TARGET
     if (cover <= 0.001)
         return float4(outside, base.a);
 
-    // Altura y normal suave del vidrio en una sola pasada (33 lecturas en vez de 85)
-    float3 b = bevelAt(uv, max(bezel, 1.0));
-    float2 n = b.xy;
-    float h = b.z;
-
-    float edge = saturate((1.0 - h) * 2.0);   // 1 en el borde, 0 en la zona plana
+    // Normal y "edge" (1 en el borde, 0 en la zona plana)
+    float R = max(bezel, 1.0);
+    float2 n;
+    float edge;
+    if (smooth_bevel) {
+        float3 b = bevelRays(uv, R);
+        n = b.xy;
+        edge = 1.0 - saturate(b.z / R);       // mismo perfil que el shader de panel
+    } else {
+        // Método rápido: altura y normal en una sola pasada (33 lecturas)
+        float3 b = bevelAt(uv, R);
+        n = b.xy;
+        edge = saturate((1.0 - b.z) * 2.0);
+    }
     // Perfil circular: 1 - sqrt(1 - edge²) es la "altura" de un cuarto de círculo; su pendiente
     // se dispara en la orilla, que es donde iOS comprime el fondo.
     float lens_circ = 1.0 - sqrt(saturate(1.0 - edge * edge));
@@ -274,10 +378,10 @@ float4 mainImage(VertData v_in) : TARGET
             cos(wp.y + t * 0.9) * sin(wp.x * 0.8 + t * 0.6)
         );
         wave_offset_px = w * liquid_wave * (0.35 + 0.65 * edge);
-        // Ojo: en la zona plana del centro bevelAt devuelve n = (0,0), así que aquí nw = w * k y al
-        // normalizar queda un vector unitario con dirección arbitraria. Es inofensivo porque ahí
-        // edge = 0, y lens, rim y edge_glint (lo único que usa n) valen 0. Si en el futuro usas n
-        // fuera del bisel, multiplica primero por edge o revisa length(b.xy) antes de normalizar.
+        // Ojo: en la zona plana del centro los dos métodos del bisel devuelven n = (0,0), así que aquí
+        // nw = w * k y al normalizar queda un vector unitario con dirección arbitraria. Es inofensivo
+        // porque ahí edge = 0, y lens, rim y edge_glint (lo único que usa n) valen 0. Si en el futuro
+        // usas n fuera del bisel, multiplica primero por edge o revisa length(n) antes de normalizar.
         float2 nw = n + w * saturate(liquid_wave * 0.015);
         n = nw / max(length(nw), 0.0001);
     }

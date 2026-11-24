@@ -152,6 +152,13 @@ uniform float back_light<
     float minimum = 0.0; float maximum = 1.0; float step = 0.01;
 > = 0.4;
 
+// Smooth bezel: measures the distance to the edge with rays instead of averaging the shape at 32
+// points. Removes the facets that show up on curved shapes with a wide bezel, at the cost of ~97
+// shape reads per glass pixel instead of 33. Turn it off if your PC is struggling.
+uniform bool smooth_bevel<
+    string label = "Smooth bezel (no facets, more reads)";
+> = true;
+
 // Fast texture-free hash for sample rotation and the frost effect.
 // Why not the classic frac(sin(dot(p, ...)) * 43758.5453): with pixel coordinates the argument
 // to sin() reaches ~150,000, and on many GPUs (Intel, some AMD, OpenGL in general) sin() loses
@@ -213,6 +220,95 @@ float3 bevelAt(float2 uv, float radius_px)
     return float3(n.x, n.y, h);
 }
 
+// Same as shapeAt but without implicit derivatives, for reads inside branches and loops with early
+// exit (Sample there gives undefined results on some GPUs).
+float shapeAtLod(float2 uv)
+{
+    float4 s = shape_source.SampleLevel(textureSampler, uv, 0.0);
+    if (use_luminance)
+        return saturate(dot(s.rgb, float3(0.2126, 0.7152, 0.0722)));
+    return s.a;
+}
+
+// Bezel from the distance to the edge: outward normal (xy) and distance in pixels (z).
+// Why: bevelAt reads the shape at 32 fixed points and each one switches abruptly when it crosses
+// the edge, so height and normal move in steps; on curved shapes with a wide bezel you see facets.
+// Here each of the 12 rays finds where coverage crosses 0.5 (4 coarse steps, 4 bisection steps and
+// a linear interpolation), which gives a continuous distance with sub-pixel precision. The distance
+// is a soft minimum of the rays and the normal is the average of the directions closest to the
+// edge. Everything varies continuously: no steps.
+// The soft minimum is accumulated on the fly (no array): when a shorter ray shows up, the
+// accumulators are rescaled. No #define, [unroll] or local arrays, which OBS's effect translator
+// (especially to GLSL on macOS and Linux) doesn't always accept.
+float3 bevelRays(float2 uv, float radius_px)
+{
+    float step_len = radius_px * 0.25;
+    float kd = 0.04 * radius_px + 1.0;      // softness of the minimum for the distance (px)
+    float kn = 0.15 * radius_px + 1.0;      // softness for the normal (wider = smoother)
+    float r_min = radius_px;
+    float d_acc = 0.0;
+    float wd_sum = 0.0;
+    float2 n_acc = float2(0.0, 0.0);
+    float fk = 0.0;
+
+    for (int k = 0; k < 12; k++) {
+        float a = (fk + 0.5) * 0.52359878;   // 2π / 12
+        float2 u = float2(cos(a), sin(a));
+        float2 dir = u * uv_pixel_interval;
+        float lo = 0.0;
+        float hi = radius_px;
+        float s_lo = 1.0;
+        float s_hi = 0.0;
+        float prev = 1.0;
+        bool found = false;
+        // Coarse steps: first point on the ray that is already outside the shape
+        float fj = 1.0;
+        for (int j = 0; j < 4; j++) {
+            if (!found) {
+                float s = shapeAtLod(uv + dir * (step_len * fj));
+                if (s < 0.5) {
+                    found = true;
+                    lo = step_len * (fj - 1.0);
+                    hi = step_len * fj;
+                    s_lo = prev;
+                    s_hi = s;
+                }
+                prev = s;
+            }
+            fj += 1.0;
+        }
+        float r = radius_px;   // no edge on this ray within the bezel
+        if (found) {
+            for (int b = 0; b < 4; b++) {
+                float mid = 0.5 * (lo + hi);
+                float s = shapeAtLod(uv + dir * mid);
+                if (s >= 0.5) { lo = mid; s_lo = s; } else { hi = mid; s_hi = s; }
+            }
+            // Linear interpolation inside the last segment: sub-pixel precision
+            r = lo + (hi - lo) * saturate((s_lo - 0.5) / max(s_lo - s_hi, 0.0001));
+        }
+
+        // Accumulated soft minimum: rays almost as short as the minimum also count, so nothing
+        // jumps when the shortest ray changes. If this ray is the new minimum, what was already
+        // accumulated is rescaled as if it had been weighted against it from the start.
+        if (r < r_min) {
+            d_acc *= exp(-(r_min - r) / kd);
+            wd_sum *= exp(-(r_min - r) / kd);
+            n_acc *= exp(-(r_min - r) / kn);
+            r_min = r;
+        }
+        float wd = exp(-(r - r_min) / kd);
+        d_acc += wd * r;
+        wd_sum += wd;
+        // Rays that found no edge don't vote for the direction
+        if (found)
+            n_acc += u * exp(-(r - r_min) / kn);
+        fk += 1.0;
+    }
+    float2 n = n_acc / max(length(n_acc), 0.0001);
+    return float3(n.x, n.y, d_acc / wd_sum);
+}
+
 // Main scene blur: 32 spiral samples with Gaussian weights.
 // Why 32 and not 16: at large radii, 16 samples are so far apart that instead of a blur you
 // see sharp overlapping "copies" (blocks and stripes). The Gaussian weight makes the outer
@@ -252,12 +348,20 @@ float4 mainImage(VertData v_in) : TARGET
     if (cover <= 0.001)
         return float4(outside, base.a);
 
-    // Glass height and smooth normal in a single pass (33 reads instead of 85)
-    float3 b = bevelAt(uv, max(bezel, 1.0));
-    float2 n = b.xy;
-    float h = b.z;
-
-    float edge = saturate((1.0 - h) * 2.0);   // 1 at the edge, 0 in the flat area
+    // Normal and "edge" (1 at the edge, 0 in the flat area)
+    float R = max(bezel, 1.0);
+    float2 n;
+    float edge;
+    if (smooth_bevel) {
+        float3 b = bevelRays(uv, R);
+        n = b.xy;
+        edge = 1.0 - saturate(b.z / R);       // same profile as the panel shader
+    } else {
+        // Fast method: height and normal in a single pass (33 reads)
+        float3 b = bevelAt(uv, R);
+        n = b.xy;
+        edge = saturate((1.0 - b.z) * 2.0);
+    }
     // Circular profile: 1 - sqrt(1 - edge²) is the "height" of a quarter circle; its slope
     // shoots up at the rim, which is where iOS squeezes the background.
     float lens_circ = 1.0 - sqrt(saturate(1.0 - edge * edge));
@@ -274,10 +378,10 @@ float4 mainImage(VertData v_in) : TARGET
             cos(wp.y + t * 0.9) * sin(wp.x * 0.8 + t * 0.6)
         );
         wave_offset_px = w * liquid_wave * (0.35 + 0.65 * edge);
-        // Note: in the flat center bevelAt returns n = (0,0), so here nw = w * k and normalizing
-        // it yields a unit vector pointing in an arbitrary direction. That's harmless because
-        // edge = 0 there, and lens, rim and edge_glint (the only things that use n) are 0. If you
-        // ever use n outside the bezel, multiply by edge first or check length(b.xy) before normalizing.
+        // Note: in the flat center both bezel methods return n = (0,0), so here nw = w * k and
+        // normalizing it yields a unit vector pointing in an arbitrary direction. That's harmless
+        // because edge = 0 there, and lens, rim and edge_glint (the only things that use n) are 0. If
+        // you ever use n outside the bezel, multiply by edge first or check length(n) before normalizing.
         float2 nw = n + w * saturate(liquid_wave * 0.015);
         n = nw / max(length(nw), 0.0001);
     }
