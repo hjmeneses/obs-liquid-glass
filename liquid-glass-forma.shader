@@ -217,7 +217,7 @@ float3 bevelAt(float2 uv, float radius_px)
 // Por qué 32 y no 16: con radios grandes, 16 muestras quedan tan separadas que en vez de un
 // blur se ven "copias" nítidas superpuestas (bloques y rayas). El peso gaussiano hace que el
 // anillo exterior, que es el que más delata las copias, aporte poco, como un blur real.
-float3 sceneBlur(float2 uv, float radius_px, float rot_offset)
+float3 sceneBlur(float2 uv, float radius_px, float rot_offset, float t_offset)
 {
     if (radius_px < 0.5)
         return image.Sample(textureSampler, uv).rgb;
@@ -227,7 +227,7 @@ float3 sceneBlur(float2 uv, float radius_px, float rot_offset)
     float fi = 0.0;
     for (int i = 0; i < 32; i++) {
         float a = fi * 2.39996323 + rot_offset;
-        float t = sqrt((fi + 0.5) / 32.0);          // 0..1, reparto uniforme en el disco
+        float t = sqrt((fi + t_offset) / 32.0);     // 0..1, reparto uniforme en el disco
         float w = exp(-2.5 * t * t);                // gaussiana: el borde del disco pesa ~8%
         acc += image.Sample(textureSampler, uv + float2(cos(a), sin(a)) * (t * radius_px) * uv_pixel_interval).rgb * w;
         w_sum += w;
@@ -298,14 +298,23 @@ float4 mainImage(VertData v_in) : TARGET
     float noise = hash12(pos);
     float rot = (frost_amount > 0.001) ? (noise * 6.2831853 * saturate(frost_amount * 2.0)) : 0.0;
 
+    // Jitter del disco de desenfoque por píxel (interleaved gradient noise, Jimenez 2014): gira el
+    // espiral y desplaza los radios un poco distinto en cada píxel. Por qué: con 32 muestras fijas,
+    // cada muestra cambia de golpe al cruzar una orilla nítida (texto blanco, líneas), y con radios
+    // grandes eso se ve como arcos o copias escalonadas. Con jitter esos escalones se vuelven un grano
+    // finísimo que no se nota. No cuesta lecturas extra: el ángulo ya se calculaba por píxel.
+    float ign = frac(52.9829189 * frac(dot(floor(pos), float2(0.06711056, 0.00583715))));
+    rot += ign * 6.2831853;
+    float t_off = frac(ign * 7.0);
+
     // Optimización: 1 sola pasada de blur si no hay dispersión perceptible en este píxel
     float3 col;
     if (dispersion < 0.001 || length(disp_px) * dispersion < 0.15) {
-        col = sceneBlur(uv_in + disp, blur_radius, rot);
+        col = sceneBlur(uv_in + disp, blur_radius, rot, t_off);
     } else {
-        col.r = sceneBlur(uv_in + disp * (1.0 + dispersion), blur_radius, rot).r;
-        col.g = sceneBlur(uv_in + disp, blur_radius, rot).g;
-        col.b = sceneBlur(uv_in + disp * (1.0 - dispersion), blur_radius, rot).b;
+        col.r = sceneBlur(uv_in + disp * (1.0 + dispersion), blur_radius, rot, t_off).r;
+        col.g = sceneBlur(uv_in + disp, blur_radius, rot, t_off).g;
+        col.b = sceneBlur(uv_in + disp * (1.0 - dispersion), blur_radius, rot, t_off).b;
     }
 
     // Saturación, tinte y grano de escarcha

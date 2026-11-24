@@ -217,7 +217,7 @@ float3 bevelAt(float2 uv, float radius_px)
 // Why 32 and not 16: at large radii, 16 samples are so far apart that instead of a blur you
 // see sharp overlapping "copies" (blocks and stripes). The Gaussian weight makes the outer
 // ring, which gives the copies away the most, contribute little, like a real blur.
-float3 sceneBlur(float2 uv, float radius_px, float rot_offset)
+float3 sceneBlur(float2 uv, float radius_px, float rot_offset, float t_offset)
 {
     if (radius_px < 0.5)
         return image.Sample(textureSampler, uv).rgb;
@@ -227,7 +227,7 @@ float3 sceneBlur(float2 uv, float radius_px, float rot_offset)
     float fi = 0.0;
     for (int i = 0; i < 32; i++) {
         float a = fi * 2.39996323 + rot_offset;
-        float t = sqrt((fi + 0.5) / 32.0);          // 0..1, uniform spread over the disc
+        float t = sqrt((fi + t_offset) / 32.0);     // 0..1, uniform spread over the disc
         float w = exp(-2.5 * t * t);                // Gaussian: the disc edge weighs ~8%
         acc += image.Sample(textureSampler, uv + float2(cos(a), sin(a)) * (t * radius_px) * uv_pixel_interval).rgb * w;
         w_sum += w;
@@ -298,14 +298,23 @@ float4 mainImage(VertData v_in) : TARGET
     float noise = hash12(pos);
     float rot = (frost_amount > 0.001) ? (noise * 6.2831853 * saturate(frost_amount * 2.0)) : 0.0;
 
+    // Per-pixel jitter of the blur disc (interleaved gradient noise, Jimenez 2014): rotates the
+    // spiral and shifts the radii slightly differently on every pixel. Why: with 32 fixed taps each
+    // tap switches abruptly when it crosses a sharp edge (white text, lines), and at large radii that
+    // shows up as arcs or stepped copies. With jitter the steps become a very fine grain you don't
+    // notice. No extra reads: the angle was already computed per pixel.
+    float ign = frac(52.9829189 * frac(dot(floor(pos), float2(0.06711056, 0.00583715))));
+    rot += ign * 6.2831853;
+    float t_off = frac(ign * 7.0);
+
     // Optimization: a single blur pass when this pixel has no visible dispersion
     float3 col;
     if (dispersion < 0.001 || length(disp_px) * dispersion < 0.15) {
-        col = sceneBlur(uv_in + disp, blur_radius, rot);
+        col = sceneBlur(uv_in + disp, blur_radius, rot, t_off);
     } else {
-        col.r = sceneBlur(uv_in + disp * (1.0 + dispersion), blur_radius, rot).r;
-        col.g = sceneBlur(uv_in + disp, blur_radius, rot).g;
-        col.b = sceneBlur(uv_in + disp * (1.0 - dispersion), blur_radius, rot).b;
+        col.r = sceneBlur(uv_in + disp * (1.0 + dispersion), blur_radius, rot, t_off).r;
+        col.g = sceneBlur(uv_in + disp, blur_radius, rot, t_off).g;
+        col.b = sceneBlur(uv_in + disp * (1.0 - dispersion), blur_radius, rot, t_off).b;
     }
 
     // Saturation, tint and frost grain
