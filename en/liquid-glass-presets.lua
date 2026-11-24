@@ -116,7 +116,7 @@ local function scan_source(src, list, seen)
             local fs = obs.obs_source_get_settings(f)
             local file = obs.obs_data_get_string(fs, "shader_file_name") or ""
             obs.obs_data_release(fs)
-            if file:find("liquid%-glass") then
+            if file:find("liquid%-glass") and not file:match("liquid%-glass%-lente%.shader$") then
                 local fname = obs.obs_source_get_name(f)
                 -- "shape" = English shader, "forma" = Spanish shader
                 local kind = (file:find("shape") or file:find("forma")) and "  (shape)" or "  (panel)"

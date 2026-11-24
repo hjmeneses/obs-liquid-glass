@@ -21,8 +21,9 @@ Shaders para **OBS Studio** que imitan el efecto de vidrio líquido ("Liquid Gla
 |---|---|
 | `liquid-glass.shader` | Panel de vidrio rectangular con esquinas redondeadas. Posición, tamaño y radio se ajustan con sliders. Para varios paneles, agrega el filtro varias veces. |
 | `liquid-glass-forma.shader` | La forma del vidrio la define **otra fuente o escena** (PNG con transparencia, texto, figuras…). Donde esa fuente es opaca (o blanca, en modo brillo) aparece vidrio que refracta la escena. |
+| `liquid-glass-lente.shader` | Panel de vidrio con modelo óptico: una placa plana con el canto redondeado. Ver [abajo](#vidrio-con-modelo-óptico-liquid-glass-lenteshader). |
 
-Las versiones en inglés están en la carpeta `en/`. Tienen el mismo código y los mismos nombres de parámetros, así que los presets funcionan con cualquiera de los dos idiomas.
+Los shaders de panel y forma tienen versiones en inglés en `en/` y comparten los presets del script. El de lente tiene sus propios controles, solo en español.
 
 ## Instalación
 
@@ -40,7 +41,32 @@ Las versiones en inglés están en la carpeta `en/`. Tienen el mismo código y l
 
 **Tip:** el filtro solo refracta lo que hay en la fuente donde se aplica. Para que el vidrio refracte todo lo que está detrás, aplícalo a la escena completa (o a un grupo del tamaño del canvas).
 
+### Vidrio con modelo óptico (`liquid-glass-lente.shader`)
+
+Los otros dos shaders buscan el aspecto de iOS. Este calcula lo que haría un vidrio real: una placa plana apoyada sobre la imagen, con el canto redondeado.
+
+- **Refracción (ley de Snell, índice 1.49 como el acrílico):** en el canto la superficie se inclina y desvía el rayo hacia dentro, como una lupa. El grosor se reduce donde el canto baja, así que el desplazamiento depende del grosor real en cada punto.
+- **Imagen en espejo en la orilla:** con vidrio grueso puede aparecer una franja delgada con la imagen invertida. No es un error: el fondo queda más allá del foco del canto, como pasa con un vidrio grueso real. Baja **Grosor del vidrio** si no la quieres.
+- **Tinte por absorción (Beer-Lambert):** el color filtra la luz en vez de pintarla encima, y se intensifica donde la luz recorre más vidrio. *Cantidad de tinte* entre 0.3 y 0.5 se nota bien.
+- **Reflejo (Fresnel):** el canto refleja la escena que lo rodea (desenfocada); el centro casi no refleja (4%). *Intensidad del reflejo* escala ese reflejo y el brillo de la luz.
+- **Dispersión de color:** cada color usa un índice ligeramente distinto. El valor por defecto es unas 3 veces más fuerte que en el acrílico real, para que se aprecie.
+
+| Parámetro | Efecto |
+|---|---|
+| Centro X/Y, Ancho, Alto (%) | Posición y tamaño del panel, en porcentaje del lienzo |
+| Radio de esquinas (px) | Redondeo de las esquinas vistas desde arriba |
+| Ancho del bisel (px) | Ancho del canto redondeado |
+| Grosor del vidrio (px) | Distancia de la cara de arriba a la imagen: más grosor, más refracción |
+| Desenfoque (px) | Esmerilado del vidrio; es menor en el canto para que se vea la refracción |
+| Ángulo de la luz | De dónde viene la luz del reflejo especular |
+| Ondulación animada | Mueve la superficie (refracción y reflejos juntos) |
+| Sombra | Tamaño y opacidad de la sombra proyectada |
+
+Los tamaños en px son absolutos: en un lienzo 4K conviene aumentarlos.
+
 ## Parámetros principales
+
+Para `liquid-glass.shader` y `liquid-glass-forma.shader`:
 
 | Parámetro | Efecto |
 |---|---|
@@ -82,7 +108,7 @@ También puedes **guardar tus valores actuales** con un nombre y aplicarlos desp
 Si modificas los shaders o el script, `tools/check.ps1` revisa todo en un paso:
 
 ```powershell
-pwsh tools/check.ps1                 # compila los 4 shaders, revisa el Lua y que español = inglés
+pwsh tools/check.ps1                 # compila los shaders, revisa el Lua y que español = inglés
 pwsh tools/check.ps1 -SyncTo $HOME   # además, si todo pasa, copia los shaders a esa carpeta
 ```
 
@@ -108,6 +134,13 @@ The `en/` folder has the English versions, with English slider labels and commen
 | `en/liquid-glass.shader` | Rounded-rectangle glass panel. Position, size and corner radius are slider controls. Add the filter multiple times for several panels. |
 | `en/liquid-glass-shape.shader` | The glass shape comes from **another source or scene** (transparent PNG, text, shapes…). Wherever that source is opaque (or white, in luminance mode) you get glass refracting the scene. |
 | `en/liquid-glass-presets.lua` | OBS script with one-click presets (see below). |
+
+The root also has [`liquid-glass-lente.shader`](liquid-glass-lente.shader) (Spanish controls only). Instead of imitating the iOS look, it models a real piece of glass: a flat slab resting on the image with a rounded edge.
+
+- Snell refraction (IOR 1.49, like acrylic) through the curved edge, using the actual local thickness. Thick glass can show a thin mirrored band at the rim, as real glass does when the background is past the edge's focal point; lower **Grosor del vidrio** (glass thickness) to avoid it.
+- Tint by absorption (Beer-Lambert): it filters light instead of painting over it, and gets stronger where light travels through more glass. Try **Cantidad de tinte** 0.3–0.5.
+- Fresnel reflection of the surrounding (blurred) scene at the edge, about 4% at the flat center.
+- Color dispersion about 3× stronger than real acrylic by default, so it's visible.
 
 ### Install
 
@@ -164,7 +197,7 @@ You can also save your current values under a name and reuse them on other filte
 
 ### Checking changes
 
-If you edit the shaders or the script, `tools/check.ps1` checks everything in one step: it compiles the 4 shaders with `fxc`, checks the Lua syntax, and verifies that the Spanish and English code is identical apart from comments and strings. With `-SyncTo <folder>` it also copies the shaders there when everything passes. It needs the Windows SDK and Node.js; the first run installs `luaparse` into `%LOCALAPPDATA%\obs-liquid-glass-check`.
+If you edit the shaders or the script, `tools/check.ps1` checks everything in one step: it compiles the 5 shaders with `fxc`, checks the Lua syntax, and verifies that the Spanish and English code is identical apart from comments and strings. With `-SyncTo <folder>` it also copies the shaders there when everything passes. It needs the Windows SDK and Node.js; the first run installs `luaparse` into `%LOCALAPPDATA%\obs-liquid-glass-check`.
 
 ## Licencia / License
 

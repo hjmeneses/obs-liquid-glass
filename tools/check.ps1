@@ -3,7 +3,7 @@
     Verifica todo el repo en un solo paso / Checks the whole repo in one step.
 
 .DESCRIPTION
-    1. Compila los 4 shaders con fxc (ps_5_0), con una cabecera que imita lo que obs-shaderfilter
+    1. Compila los shaders con fxc (ps_5_0), con una cabecera que imita lo que obs-shaderfilter
        declara antes del shader (image, uv_size, elapsed_time...). Así se detectan errores de sintaxis
        y de tipos sin abrir OBS. Los avisos X3570 son normales.
     2. Revisa la sintaxis de los dos scripts Lua con luaparse (Node.js). La primera vez lo instala en
@@ -11,7 +11,7 @@
     3. Compara el código en español con el de en/, quitando comentarios y textos: deben ser idénticos.
     4. Con -SyncTo, si todo pasó, copia los shaders en español a esa carpeta (la que usa OBS).
 
-    Compiles the 4 shaders with fxc, checks Lua syntax with luaparse, verifies that the Spanish and
+    Compiles the shaders with fxc, checks Lua syntax with luaparse, verifies that the Spanish and
     English code is identical apart from comments and strings, and optionally syncs the shaders.
 
 .EXAMPLE
@@ -40,9 +40,12 @@ function Write-Result([string]$name, [bool]$ok, [string]$detail = '') {
     if ($detail) { Write-Host "  $detail" -ForegroundColor DarkGray } else { Write-Host '' }
 }
 
-$shaders = @(
+$spanishShaders = @(
     'liquid-glass.shader',
     'liquid-glass-forma.shader',
+    'liquid-glass-lente.shader'
+)
+$shaders = $spanishShaders + @(
     'en/liquid-glass.shader',
     'en/liquid-glass-shape.shader'
 )
@@ -181,7 +184,7 @@ process.exit(bad ? 1 : 0);
         if ($failed) {
             Write-Host '       no se copió nada porque hubo errores' -ForegroundColor Yellow
         } else {
-            foreach ($s in 'liquid-glass.shader', 'liquid-glass-forma.shader') {
+            foreach ($s in $spanishShaders) {
                 $src = Join-Path $root $s
                 $dst = Join-Path $SyncTo $s
                 Copy-Item $src $dst -Force
