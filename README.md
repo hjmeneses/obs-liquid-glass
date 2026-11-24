@@ -2,6 +2,12 @@
 
 Shaders para **OBS Studio** que imitan el efecto de vidrio líquido ("Liquid Glass") de iOS: desenfoque, refracción en el bisel, dispersión de color, tinte, brillo de borde y sombra.
 
+![Botón Control con esquinas squircle, panel grande oscuro, corazón de vidrio con el shader de forma y barra oscura tipo búsqueda, sobre un fondo de colores con cuadrícula / Control button with squircle corners, dark large panel, glass heart made with the shape shader and a dark search-style bar over a colourful grid background](images/liquid-glass.png)
+
+![Un panel de vidrio se desliza sobre el texto: el bisel lo refracta, la luz de borde gira y el vidrio ondula / A glass panel glides over the text: the bezel refracts it, the rim light turns and the glass ripples](images/liquid-glass.gif)
+
+*Simulación aproximada de los shaders con los presets del script / Approximate simulation of the shaders with the script's presets.*
+
 *[English below](#english)*
 
 ## Requisitos
