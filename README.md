@@ -71,6 +71,17 @@ Las versiones en inglés están en la carpeta `en/`. Tienen el mismo código y l
 
 También puedes **guardar tus valores actuales** con un nombre y aplicarlos después en otros filtros. Si tenías abiertas las propiedades del filtro, ciérralas y ábrelas de nuevo para ver los sliders actualizados.
 
+## Verificar cambios
+
+Si modificas los shaders o el script, `tools/check.ps1` revisa todo en un paso:
+
+```powershell
+pwsh tools/check.ps1                 # compila los 4 shaders, revisa el Lua y que español = inglés
+pwsh tools/check.ps1 -SyncTo $HOME   # además, si todo pasa, copia los shaders a esa carpeta
+```
+
+Necesita el Windows SDK (por `fxc.exe`) y Node.js. La primera vez instala `luaparse` en `%LOCALAPPDATA%\obs-liquid-glass-check`.
+
 ---
 
 ## English
@@ -144,6 +155,10 @@ The `en/` folder has the English versions, with English slider labels and commen
 | Large object | Decorative shapes and logos (400 px+) | Wide bezel, strong refraction, little blur: a thick piece of glass |
 
 You can also save your current values under a name and reuse them on other filters. If the filter's properties window was open, reopen it to see the updated sliders.
+
+### Checking changes
+
+If you edit the shaders or the script, `tools/check.ps1` checks everything in one step: it compiles the 4 shaders with `fxc`, checks the Lua syntax, and verifies that the Spanish and English code is identical apart from comments and strings. With `-SyncTo <folder>` it also copies the shaders there when everything passes. It needs the Windows SDK and Node.js; the first run installs `luaparse` into `%LOCALAPPDATA%\obs-liquid-glass-check`.
 
 ## Licencia / License
 
