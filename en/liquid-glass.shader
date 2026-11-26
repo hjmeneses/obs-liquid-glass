@@ -90,6 +90,26 @@ uniform float saturation<
 
 uniform float4 tint_color = {1.0, 1.0, 1.0, 1.0};
 
+// Tint gradient. 0 = a single color (as before). 1 = from tint_color to tint_color2.
+// 2 = from tint_color to no tint: the glass goes from tinted to clear.
+uniform int tint_gradient<
+    string label = "Tint gradient";
+    string widget_type = "select";
+    int    option_0_value = 0; string option_0_label = "No gradient (one color)";
+    int    option_1_value = 1; string option_1_label = "From one color to another (tint_color2)";
+    int    option_2_value = 2; string option_2_label = "From a color to transparent";
+> = 0;
+
+uniform float4 tint_color2 = {0.35, 0.6, 1.0, 1.0};
+
+// Direction of the gradient: tint_color on one side and tint_color2 (or no tint) on the other.
+// Same convention as the light angle: 0 = toward the right, 90 = upward.
+uniform float tint_angle<
+    string label = "Gradient angle (0 = toward the right, 90 = upward)";
+    string widget_type = "slider";
+    float minimum = 0.0; float maximum = 360.0; float step = 1.0;
+> = 0.0;
+
 uniform float tint_amount<
     string label = "Tint amount";
     string widget_type = "slider";
@@ -326,7 +346,22 @@ float4 mainImage(VertData v_in) : TARGET
     float lum = dot(col, float3(0.2126, 0.7152, 0.0722));
     col = lerp(float3(lum, lum, lum), col, saturation);
     // edge is 1 at the rim and 0 in the flat area: the tint is only reduced inside the bezel
-    col = lerp(col, tint_color.rgb, tint_amount * (1.0 - tint_edge * edge));
+    float tint_k = tint_amount * (1.0 - tint_edge * edge);
+    float3 tint_rgb = tint_color.rgb;
+    if (tint_gradient > 0) {
+        // gt = 0 on the tint_color side and 1 on the opposite side.
+        // ext is half the panel measured along the gradient direction, so it runs exactly from edge
+        // to edge at any angle.
+        float ga = radians(tint_angle);
+        float2 gd = float2(cos(ga), -sin(ga));
+        float ext = abs(half_size.x * gd.x) + abs(half_size.y * gd.y);
+        float gt = saturate(0.5 + 0.5 * dot(p, gd) / max(ext, 1.0));
+        if (tint_gradient == 1)
+            tint_rgb = lerp(tint_color.rgb, tint_color2.rgb, gt);
+        else
+            tint_k *= 1.0 - gt;
+    }
+    col = lerp(col, tint_rgb, tint_k);
     if (frost_amount > 0.001)
         col += (noise - 0.5) * frost_amount * 0.12;
 

@@ -75,6 +75,7 @@ Para `liquid-glass.shader` y `liquid-glass-forma.shader`:
 | Ancho del bisel | Qué tan ancha es la zona curva del borde |
 | Dispersión de color | Separación RGB en el bisel (aberración cromática) |
 | Saturación / Tinte | Color del vidrio |
+| Degradado del tinte | *Sin degradado*, *De un color a otro* (de `tint_color` a `tint_color2`) o *De un color a transparente* (el vidrio pasa de teñido a limpio). *Ángulo del degradado*: 0 = hacia la derecha, 90 = hacia arriba. En el panel va de orilla a orilla; en `liquid-glass-forma.shader` se centra en *Centro de la figura X/Y* y recorre *Largo del degradado* |
 | Brillo de borde / Ángulo de la luz | Reflejo especular; *Giro de la luz* lo anima |
 | Sombra | Opacidad y tamaño de la sombra proyectada |
 | Ondulación líquida / Velocidad | Deformación orgánica animada en el vidrio y sus reflejos |
@@ -83,7 +84,7 @@ Para `liquid-glass.shader` y `liquid-glass-forma.shader`:
 | Tinte en el bisel | 1 = el tinte se desvanece en el borde (clave para vidrio oscuro) |
 | Luz del lado opuesto | Brillo en el lado del borde contrario a la luz |
 | Forma de esquina | 2 = esquina circular; 4–6 = squircle (esquina continua estilo iOS). Solo en `liquid-glass.shader` |
-| Magnificación del interior | Zoom de todo el interior hacia el centro, como lente gruesa (1.03–1.08 es sutil). En `liquid-glass-forma.shader` el centro se elige con *Centro de magnificación X/Y* |
+| Magnificación del interior | Zoom de todo el interior hacia el centro, como lente gruesa (1.03–1.08 es sutil). En `liquid-glass-forma.shader` el centro se elige con *Centro de la figura X/Y* |
 | Suavizado del borde | Ancho de la transición en la orilla, útil a 4K. Solo en `liquid-glass.shader` |
 
 ## Presets con botones (script)
@@ -167,6 +168,7 @@ The root also has [`liquid-glass-lente.shader`](liquid-glass-lente.shader) (Span
 | Bezel width | How wide the curved edge zone is |
 | Color dispersion | RGB split at the bezel (chromatic aberration) |
 | Saturation / Tint | Glass color |
+| Tint gradient | *No gradient*, *From one color to another* (from `tint_color` to `tint_color2`) or *From a color to transparent* (the glass goes from tinted to clear). *Gradient angle*: 0 = toward the right, 90 = upward. On the panel it runs edge to edge; in `liquid-glass-shape.shader` it is centered on *Figure center X/Y* and spans *Gradient length* |
 | Rim highlight / Light angle | Specular reflection; *Light rotation* animates it |
 | Shadow | Drop shadow opacity and size |
 | Liquid wave / Wave speed | Animated organic distortion of the glass and its reflections |
@@ -175,7 +177,7 @@ The root also has [`liquid-glass-lente.shader`](liquid-glass-lente.shader) (Span
 | Bezel tint | 1 = tint fades out at the edge (key for dark glass) |
 | Back light | Highlight on the rim side facing away from the light |
 | Corner shape | 2 = circular corner; 4–6 = squircle (iOS-style continuous corner). `liquid-glass.shader` only |
-| Interior magnification | Zooms the whole interior toward the center, like a thick lens (1.03–1.08 is subtle). In `liquid-glass-shape.shader` you pick the center with *Magnification center X/Y* |
+| Interior magnification | Zooms the whole interior toward the center, like a thick lens (1.03–1.08 is subtle). In `liquid-glass-shape.shader` you pick the center with *Figure center X/Y* |
 | Edge feathering | Width of the edge transition, useful at 4K. `liquid-glass.shader` only |
 
 ### Presets with buttons (script)
